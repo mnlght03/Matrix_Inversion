@@ -191,43 +191,33 @@ namespace intrinsics {
   float* mulVectorByMatrix(float* vec, float** mat, const int& N) {
     float *res = new float[N];
     const int sumsLen = N / 4;
-    float *leftovers = nullptr;
     const int leftoversLen = N - sumsLen * 4;
-    if (leftoversLen != 0) {
-      leftovers = new float[leftoversLen]();
-    }
     __m128 *sums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
-    __m128 *tempSums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
+    __m128 temp;
     for (int i = 0; i < N; i++) {
       __m128 scalar = _mm_load1_ps(&vec[i]);
       for (int j = 0; j < sumsLen; j++) {
         if (i == 0)
           sums[j] = _mm_setzero_ps();
-        tempSums[j] = _mm_loadu_ps(&mat[i][j * 4]);
-        tempSums[j] = _mm_mul_ps(tempSums[j], scalar);
-        sums[j] = _mm_add_ps(sums[j], tempSums[j]);
+        temp = _mm_loadu_ps(&mat[i][j * 4]);
+        temp = _mm_mul_ps(temp, scalar);
+        sums[j] = _mm_add_ps(sums[j], temp);
+        if (i == N - 1) {
+          _mm_storeu_ps(&res[j * 4], sums[j]);
+        }
       }
       if (leftoversLen != 0) {
         int matIdx = N - leftoversLen;
-        int leftoversIdx = 0;
         while (matIdx < N) {
-          leftovers[leftoversIdx++] += vec[i] * mat[i][matIdx++];
+          if (i == 0) {
+            res[matIdx] = 0;
+          }
+          res[matIdx] += vec[i] * mat[i][matIdx];
+          matIdx++;
         }
       }
     }
-    for (int i = 0; i < sumsLen; i++) {
-      _mm_storeu_ps(&res[i * 4], sums[i]);
-    }
-    if (leftoversLen != 0) {
-      int idx = N - leftoversLen;
-      int i = 0;
-      while (idx < N) {
-        res[idx++] = leftovers[i++];
-      }
-      delete[] leftovers;
-    }
     _mm_free(sums);
-    _mm_free(tempSums);
     return res;
   }
 
@@ -270,8 +260,7 @@ namespace intrinsics {
     return mat;
   }
 
-  //  DELETE LEFTOVERS FROM MATRIX MULT !!!
-  //  MAKE FUNCTIONS VOID TYPE !!!
+  //  TODO: MAKE FUNCTIONS VOID TYPE !!!
 
   // res = S * At
   float** mulMatByTransposed(float **S, float **A, const int& N,
