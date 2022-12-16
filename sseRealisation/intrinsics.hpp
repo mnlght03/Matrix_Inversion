@@ -140,8 +140,7 @@ namespace intrinsics {
     float *leftovers = nullptr;
     const int leftoversLen = N - sumsLen * 4;
     if (leftoversLen != 0) {
-      leftovers = new float[leftoversLen];
-      std::fill(leftovers, leftovers + leftoversLen, 0);
+      leftovers = new float[leftoversLen]();
     }
     __m128 *sums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
     for (int row = 0; row < N; row++) {
@@ -195,8 +194,7 @@ namespace intrinsics {
     float *leftovers = nullptr;
     const int leftoversLen = N - sumsLen * 4;
     if (leftoversLen != 0) {
-      leftovers = new float[leftoversLen];
-      std::fill(leftovers, leftovers + leftoversLen, 0);
+      leftovers = new float[leftoversLen]();
     }
     __m128 *sums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
     __m128 *tempSums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
@@ -232,15 +230,63 @@ namespace intrinsics {
     _mm_free(tempSums);
     return res;
   }
-  // float** getBMatrix(float **A, const int& N, const float& A1, const float& Ainf) {
-  //   float** B = new float*[N];
-  //   for (int i = 0; i < N; i++) {
-  //     B[i] = new float[N];
-  //   }
-  //   float scalar = 1.0 / (A1 * Ainf);
-  //   __m128 scalarVec = _mm_load1_ps(&scalar);
 
-  // }
+  float** getBAMatrix(float **A, const int& N, const float& A1, const float& Ainf) {
+    float scalar = A1 * Ainf;
+    __m128 scalarVec = _mm_load1_ps(&scalar);
+    int sumsLen = N / 4;
+    int leftoversLen = N - sumsLen * 4;
+    __m128 *sums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
+    float **mat = new float*[N];      
+    for (int i = 0; i < N; i++) {
+      mat[i] = new float[N];
+      for (int j = 0; j < N; j++) {
+        __m128 matrixEl = _mm_load1_ps(&A[j][i]);
+        for (int k = 0; k < sumsLen; k++) {
+          if (j == 0)
+            sums[k] = _mm_setzero_ps();
+          __m128 temp = _mm_load_ps(&A[j][k * 4]);
+          temp = _mm_mul_ps(matrixEl, temp);
+          sums[k] = _mm_add_ps(sums[k], temp);
+          if (j == N - 1) {
+            sums[k] = _mm_div_ps(sums[k], scalarVec);
+            _mm_storeu_ps(&mat[i][k * 4], sums[k]);
+          }
+        }
+        if (leftoversLen != 0) {
+          int idx = N - leftoversLen;
+          while (idx < N) {
+            if (j == 0)
+              mat[i][idx] = 0;
+            mat[i][idx] += A[j][idx] * A[j][i];
+            if (j == N - 1)
+              mat[i][idx] /= scalar;
+            idx++;
+          }
+        }
+      }
+    }
+    _mm_free(sums);
+    return mat;
+  }
+
+  //  DELETE LEFTOVERS FROM MATRIX MULT !!!
+  //  MAKE FUNCTIONS VOID TYPE !!!
+
+  // res = S * At
+  float** mulMatByTransposed(float **S, float **A, const int& N,
+                                   const float& A1, const float& Ainf) {
+    float **res = new float*[N];
+    for (int i = 0; i < N; i++) {
+      res[i] = new float[N];
+      float *v1 = S[i];
+      for (int j = 0; j < N; j++) {
+        float *v2 = A[j];
+        res[i][j] = mulAndSumVectors(v1, v2, N) / (A1 * Ainf);
+      }
+    }
+    return res;
+  }
 } // namespace intrinsics
 
 #endif  // _FLOATMATRIX_INTRINSICS_HPP

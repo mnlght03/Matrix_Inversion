@@ -80,17 +80,11 @@ Matrix Matrix::operator*(const Matrix& A) {
   const int N = A.getDim();
   Matrix res(N);
   float **mat = new float*[N];
-  std::cout << "MULT 1" << std::endl;
   float **thisMat = this->getMat();
   float **AMat = A.getMat();
-  float *temp = new float[N];
-  std::cout << "MULT 2" << std::endl;
   for (int i = 0; i < N; i++) {
     mat[i] = intrinsics::mulVectorByMatrix(thisMat[i], AMat, N);
-    std::cout << "MULT " << 3 + i << " " << std::endl;
   }
-  std::cout << "MULT 3" << std::endl;
-  delete[] temp;
   return Matrix(mat, N);
 }
 
@@ -145,21 +139,6 @@ Matrix Matrix::transpose() {
   return tMat;
 }
 
-// namespace {
-//   float** getBMatrix(float **A, const int& N, const float& A1, const float& Ainf) {
-//     std::cout<<"Here 5"<<std::endl;
-//     float** B = new float*[8];
-//     std::cout<<"Here 4"<<std::endl;
-//     for (int i = 0; i < N; i++) {
-//       B[i] = new float[N];
-//       // for (int j = 0; j < N; j++) {
-//       //   B[i][j] = A[j][i] / (Ainf * A1);
-//       // }
-//     }
-//     return B;
-//   }
-// }
-
 void getBMatrix(float **A, float **B, const int& N, const float& A1, const float& Ainf) {
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; j++) {
@@ -168,29 +147,31 @@ void getBMatrix(float **A, float **B, const int& N, const float& A1, const float
   }
 }
 
-Matrix invert(const Matrix& A, const int& exp) {
-  const int N = A.getDim();
+Matrix Matrix::invert(const int& exp) {
+  const int N = this->getDim();
   Matrix I(N);
   I.IdentityMatrix();
-  Matrix Res(N);
-  Res.IdentityMatrix();
-  float **matA = A.getMat();
-  // float **BMat = intrinsics::getBMatrix(thisMat, intrinsics::getA1(thisMat), intrinsics::getAinf(thisMat));
-  float **matB = new float*[N];
-  for (int i = 0; i < N; i++)
-    matB[i] = new float[N];
-  getBMatrix(matA, matB, N, intrinsics::getA1(matA, N), intrinsics::getAinf(matA, N));
-  std::cout << "Here" << std::endl;
-  Matrix B(matB, N);
-  std::cout << "Here 1" << std::endl;
-  Matrix R = I - B * A;
-  std::cout << "Here 2" << std::endl;
+  float **thisMat = this->getMat();
+  // float **matB = new float*[N];
+  // for (int i = 0; i < N; i++)
+  //   matB[i] = new float[N];
+  // getBMatrix(matA, matB, N, intrinsics::getA1(matA, N), intrinsics::getAinf(matA, N));
+  float A1 = intrinsics::getA1(thisMat, N);
+  float Ainf = intrinsics::getAinf(thisMat, N);
+  float **matBA = intrinsics::getBAMatrix(thisMat, N, A1, Ainf);
+  Matrix BA(matBA, N);
+  Matrix Temp(N);
+  Temp.IdentityMatrix();
+  Matrix R = I - BA;
+  Matrix powR = R;
   for (int i = 1; i <= exp; i++) {
-    Res += R;
+    Temp += powR;
     if (i + 1 <= exp)
-      R *= R;
+      powR *= R;
   }
-  Res *= B;
+  float **tempMat = Temp.getMat();
+  float **newRes = intrinsics::mulMatByTransposed(tempMat, thisMat, N, A1, Ainf);
+  Matrix Res(newRes, N);
   return Res;
 }
 
@@ -210,11 +191,10 @@ int main() {
       matB[i][j] = rand() % 10;
     }
   }
-  // float **BMat = getBMatrix(matA, N, 1, 1);
   Matrix A(matA, N);
   A.print();
   cout << endl;
-  Matrix B(matB, N);
+  Matrix B = A.invert(1000);
   B.print();
   cout << endl;
   Matrix mult = A * B;
