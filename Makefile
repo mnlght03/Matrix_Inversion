@@ -20,7 +20,7 @@ run_sse: build_sse
 	./sse
 
 run_intrinsics_test:
-	$(CC) $(CFLAGS) sseRealisation/intirnsics_tests.cpp /usr/local/lib/libgtest.a -lpthread -o intirnsics_tests
+	$(CC) $(CFLAGS) sseRealisation/intrinsics_tests.cpp /usr/local/lib/libgtest.a -lpthread -o intrinsics_tests && ./intrinsics_tests
 
 build_all: build_naive build_sse build_blas
 
