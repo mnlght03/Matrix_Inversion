@@ -174,30 +174,3 @@ Matrix Matrix::invert(const int& exp) {
   Matrix Res(newRes, N);
   return Res;
 }
-
-int main() {
-  int N;
-  cin >> N;
-  float **matA = new float*[N];
-  float **matB = new float*[N];
-  for (int i = 0; i < N; i++){
-    matA[i] = new float[N];
-    matB[i] = new float[N];
-  }
-  srand(time(NULL));
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
-      matA[i][j] = rand() % 10;
-      matB[i][j] = rand() % 10;
-    }
-  }
-  Matrix A(matA, N);
-  A.print();
-  cout << endl;
-  Matrix B = A.invert(1000);
-  B.print();
-  cout << endl;
-  Matrix mult = A * B;
-  mult.print();
-  return 0;
-}
