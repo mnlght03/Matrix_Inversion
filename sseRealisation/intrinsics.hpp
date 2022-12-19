@@ -84,9 +84,7 @@ namespace intrinsics {
     return res;
   }
 
-  float mulAndSumVectors(float *v1, float *v2, const int& N) {
-    const int sumsLen = N / 4;
-    __m128 *sums = (__m128*)_mm_malloc(sumsLen * sizeof(float), 16);
+  float mulAndSumVectors(float *v1, float *v2, const int& N, __m128 *sums) {
     sums[0] = _mm_setzero_ps();
     for (int i = 0; i < N / 4; i++) {
       __m128 vec1 = _mm_loadu_ps(&v1[i * 4]);
@@ -104,7 +102,6 @@ namespace intrinsics {
         idx++;
       }
     }
-    _mm_free(sums);
     return res;
   }
 
@@ -188,6 +185,47 @@ namespace intrinsics {
     return maxSum;
   }
 
+  void getA1Ainf(float **mat, const int& N, float *A1, float *Ainf) {
+    float maxRowSum = std::numeric_limits<float>::min();
+    const int sumsLen = N / 4;
+    float *leftovers = nullptr;
+    const int leftoversLen = N - sumsLen * 4;
+    if (leftoversLen != 0) {
+      leftovers = new float[leftoversLen]();
+    }
+    __m128 *colSums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
+    for (int row = 0; row < N; row++) {
+      __m128 rowSums = _mm_setzero_ps();
+      for (int col = 0; col < N / 4; col++) {
+        __m128 vec = _mm_loadu_ps(&mat[row][col * 4]);
+        rowSums = _mm_add_ps(rowSums, vec);
+        if (row == 0)
+          colSums[col] = _mm_setzero_ps();
+        colSums[col] = _mm_add_ps(colSums[col], vec);
+      }
+      float rowSum = sum128vector(rowSums);
+      if (N % 4 != 0) {
+        int idx = N / 4;
+        idx *= 4;
+        int i = 0;
+        while (idx < N) {
+          rowSum += mat[row][idx++];
+          if (leftoversLen != 0)
+            leftovers[i++] += mat[row][idx++];
+        }
+      }
+      maxRowSum = maxRowSum < rowSum ? rowSum : maxRowSum;
+    }
+    float maxColSum = getMaxValue(colSums, sumsLen);
+    for (int i = 0; i < leftoversLen; i++) {
+      maxColSum = maxColSum < leftovers[i] ? leftovers[i] : maxColSum;
+    }
+    *Ainf = maxRowSum;
+    *A1 = maxColSum;
+    _mm_free(colSums);
+    delete[] leftovers;
+  }
+
   float* mulVectorByMatrix(float* vec, float** mat, const int& N) {
     float *res = new float[N];
     const int sumsLen = N / 4;
@@ -260,20 +298,21 @@ namespace intrinsics {
     return mat;
   }
 
-  //  TODO: MAKE FUNCTIONS VOID TYPE !!!
-
   // res = S * At
   float** mulMatByTransposed(float **S, float **A, const int& N,
                                    const float& A1, const float& Ainf) {
     float **res = new float*[N];
+    int sumsLen = N / 4;
+    __m128 *sums = (__m128*)_mm_malloc(sumsLen * 4 * sizeof(float), 16);
     for (int i = 0; i < N; i++) {
       res[i] = new float[N];
       float *v1 = S[i];
       for (int j = 0; j < N; j++) {
         float *v2 = A[j];
-        res[i][j] = mulAndSumVectors(v1, v2, N) / (A1 * Ainf);
+        res[i][j] = mulAndSumVectors(v1, v2, N, sums) / (A1 * Ainf);
       }
     }
+    _mm_free(sums);
     return res;
   }
 } // namespace intrinsics
