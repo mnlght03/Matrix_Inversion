@@ -179,6 +179,23 @@ namespace {
     }
     return max;
   }
+  void getA1Ainf(const Matrix& A, float* A1, float* Ainf) {
+    const int N = A.getDim();
+    float *A1sums = new float[N];
+    *Ainf = std::numeric_limits<float>::min();
+    for(int i = 0; i < N; i++) {
+      float AinfTempSum = 0;
+      for (int j = 0; j < N; j++) {
+        if (i == 0)
+          A1sums[j] = 0;
+        A1sums[j] += Abs(A.getElem(i, j));
+        AinfTempSum += Abs(A.getElem(i, j));
+      }
+      *Ainf = *Ainf < AinfTempSum ? AinfTempSum : *Ainf;
+    }
+    *A1 = Max(A1sums, N);
+    delete[] A1sums;
+  }
   Matrix getBMatrix(const Matrix& A, const float& A1, const float& Ainf) {
     const int N = A.getDim();
     Matrix B(N);
@@ -198,6 +215,8 @@ Matrix Matrix::invert(const int& exp) {
   I.IdentityMatrix();
   Matrix Res(N);
   Res.IdentityMatrix();
+  float A1, Ainf;
+  getA1Ainf(*this, &A1, &Ainf);
   Matrix B = getBMatrix(*this, getA1(*this), getAinf(*this));
   Matrix R = I - B * *this;
   Matrix powR = R;
